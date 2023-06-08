@@ -1,11 +1,12 @@
+import threading
 import pyshark
 import dpkt
 from pyshark.tshark import tshark
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QTextEdit, QComboBox
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QTextEdit, QComboBox, QFileDialog
 from PySide6.QtCore import Qt
 from datetime import datetime
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QFileDialog
+
 
 class CaptureView(QMainWindow):
     def __init__(self):
@@ -39,10 +40,10 @@ class CaptureView(QMainWindow):
 
         # 创建开始和停止捕获按钮
         self.start_button = QPushButton("开始捕获")
-        self.start_button.clicked.connect(self.start_capture)
+        self.start_button.clicked.connect(self.start_capture_thread)
         self.stop_button = QPushButton("停止捕获")
         self.stop_button.setEnabled(False)
-        self.stop_button.clicked.connect(self.stop_capture)
+        self.stop_button.clicked.connect(self.stop_capture_thread)
 
         # 创建保存数据按钮
         self.save_button = QPushButton("保存数据")
@@ -72,6 +73,7 @@ class CaptureView(QMainWindow):
         widget.setLayout(layout)
         self.setCentralWidget(widget)
 
+        self.capture_thread = None  # 捕包线程
         self.capture = None  # PyShark抓包实例
         self.captured_packets = []  # 捕获的数据包列表
 
@@ -81,35 +83,40 @@ class CaptureView(QMainWindow):
         filtered_packets = self.filter_packets(filter_text)
         self.update_table_data(filtered_packets)
 
-    def start_capture(self):
-        # 启动数据包捕获
+    def start_capture_thread(self):
+        # 启动捕包线程
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
 
         # 获取选择的网卡
         selected_interface = self.interface_combo.currentText()
 
-        # 创建并启动PyShark抓包实例
-        self.capture = pyshark.LiveCapture(interface=selected_interface)
-        self.capture.sniff(timeout=10)
-        self.captured_packets = self.capture._packets
-        self.update_table_data(self.captured_packets)
+        # 创建并启动捕包线程
+        self.capture_thread = threading.Thread(target=self.capture_packets, args=(selected_interface,))
+        self.capture_thread.start()
 
-    def stop_capture(self):
-        # 停止数据包捕获
+    def stop_capture_thread(self):
+        # 停止捕包线程
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
 
-        # 停止PyShark抓包实例
-        if self.capture:
-            self.capture.close()
+        # 停止捕包线程
+        if self.capture_thread and self.capture_thread.is_alive():
+            self.capture_thread.join()
+
+    def capture_packets(self, interface):
+        # 捕获数据包的线程函数
+        self.capture = pyshark.LiveCapture(interface=interface)
+        self.capture.sniff(timeout=10)  
+        self.captured_packets = self.capture._packets
+        self.update_table_data(self.captured_packets)
 
     def update_table_data(self, packets):
         self.table.setRowCount(len(packets))
 
         for row, packet in enumerate(packets):
             capture_time = QTableWidgetItem(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            source_address_item = QTableWidgetItem(packet.ip.src)
+            source_address_item = QTableWidgetItem(packet.layers[1].src)
             destination_address_item = QTableWidgetItem(packet.ip.dst)
             protocol_item = QTableWidgetItem(self.get_protocol_type(packet))
             total_length_item = QTableWidgetItem(str(packet.length))
@@ -122,7 +129,7 @@ class CaptureView(QMainWindow):
             self.table.setItem(row, 3, protocol_item)
             self.table.setItem(row, 4, total_length_item)
             self.table.setItem(row, 5, data_content_item)
-        # 根据协议类型设置行背景颜色
+            # 根据协议类型设置行背景颜色
             if protocol_item.text() == "TCP":
                 protocol_item.setBackground(QColor(255, 255, 0))
             elif protocol_item.text() == "UDP":
@@ -151,14 +158,14 @@ class CaptureView(QMainWindow):
     # 获取保存文件路径
         file_dialog = QFileDialog()
         file_path, _ = file_dialog.getSaveFileName(self, "保存数据", "", "Packet Data Files (*.pcap)")
-    
-        if file_path:
-        # 保存数据到文件
-            with open(file_path, "wb") as file:
-                for packet in self.captured_packets:
-                    file.write(packet)
 
-            self.file_path = file_path
+    # 保存数据包到PCAP文件
+       
+        capture = pyshark.FileCapture(input_file=file_path, keep_packets=False)
+        for packet in self.captured_packets:
+            capture.keep_packets(packet)
+
+        self.statusBar().showMessage("数据保存成功")
 
 
     def filter_packets(self, filter_text):
