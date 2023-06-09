@@ -136,8 +136,8 @@ model.fit(train_ds,
 loss, accuracy = model.evaluate(test_ds)
 print("loss:",loss)
 print("Accuracy:", accuracy)
-# print("recall:",recall)
-# print("FPR:",FP/(FP+TN))
+print("recall:",recall_score)
+print("FPR:",f1_score)
 
 end_time = datetime.datetime.now()
 print("spend_time:",(end_time-start_time).seconds)
