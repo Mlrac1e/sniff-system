@@ -14,7 +14,7 @@ class MainWindow(QMainWindow):
 
         self.setStyleSheet("""
             QMainWindow {
-                background: #f5f5f5;
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 #FF6EFF, stop: 0.5 #6E91FF, stop: 1 #B76EFF);
             }
 
             QLabel {
