@@ -1,6 +1,8 @@
 absl-py==1.4.0
+altair==5.0.1
 appdirs==1.4.4
 astunparse==1.6.3
+attrs==23.1.0
 cachetools==5.3.1
 certifi==2023.5.7
 charset-normalizer==3.1.0
@@ -18,7 +20,9 @@ h5py==3.8.0
 idna==3.4
 importlib-metadata==6.6.0
 importlib-resources==5.12.0
+Jinja2==3.1.2
 joblib==1.2.0
+jsonschema==4.17.3
 keras==2.13.1rc0
 kiwisolver==1.4.4
 libclang==16.0.0
@@ -38,6 +42,8 @@ protobuf==4.23.2
 pyasn1==0.5.0
 pyasn1-modules==0.3.0
 pyparsing==3.0.9
+pyqtgraph==0.13.3
+pyrsistent==0.19.3
 pyshark==0.6
 PySide6==6.5.1
 PySide6-Addons==6.5.1
@@ -59,6 +65,7 @@ tensorflow-macos==2.13.0rc1
 termcolor==2.3.0
 threadpoolctl==3.1.0
 tomli==2.0.1
+toolz==0.12.0
 typing_extensions==4.6.3
 tzdata==2023.3
 urllib3==1.26.16
