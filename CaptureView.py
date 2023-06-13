@@ -1,6 +1,6 @@
 import threading
 import pyshark
-import dpkt
+import shutil
 from pyshark.tshark import tshark
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QTextEdit, QComboBox, QFileDialog, QMessageBox
 from PySide6.QtCore import Qt, QTimer
@@ -116,10 +116,12 @@ class CaptureView(QMainWindow):
 
     def capture_packets(self, interface):
         # 捕获数据包的线程函数
-        self.capture = pyshark.LiveCapture(interface=interface)
-        self.capture.sniff(timeout=10)  
+        self.capture = pyshark.LiveCapture(interface=interface,output_file="test.pcap")
+        self.capture.sniff(timeout=10)
+        self.capture.close()  # 确保捕获会话已关闭
         self.captured_packets = self.capture._packets
         self.update_table_data(self.captured_packets)
+
 
     def update_table_data(self, packets):
         self.table.setRowCount(len(packets))
@@ -164,18 +166,20 @@ class CaptureView(QMainWindow):
         self.data_text.clear()
         self.data_text.insertPlainText(packet_data)
 
+
+
     def save_data(self):
-        # 获取保存文件路径
-        file_dialog = QFileDialog()
-        file_path, _ = file_dialog.getSaveFileName(self, "保存数据", "", "Packet Data Files (*.pcap)")
+        # 获取保存文件的路径
+        file_path, _ = QFileDialog.getSaveFileName(self, "保存数据", "./", "PCAP Files (*.pcap)")
 
         if file_path:
-            # 保存数据包到PCAP文件
-            capture = pyshark.FileCapture(input_file=file_path, keep_packets=False)
-            for packet in self.captured_packets:
-                capture.keep_packets(packet)
+        # 将test.pcap文件复制到指定路径
+            shutil.copyfile("test.pcap", file_path)
+        
 
-            self.statusBar().showMessage("数据保存成功")
+        QMessageBox.information(self, "成功", "数据保存成功！")
+
+
 
     def filter_packets(self, filter_text):
         filtered_packets = []
@@ -185,6 +189,7 @@ class CaptureView(QMainWindow):
                 filtered_packets.append(packet)
 
         return filtered_packets
+
 
     def check_abnormal_traffic(self):
         # 检测异常流量
@@ -197,13 +202,3 @@ class CaptureView(QMainWindow):
         if total_packets > 0:
             # 对每个数据包进行攻击检测
             self.detect_attacks()
-
-    def process_large_traffic(self, total_packets):
-        # 处理大规模数据流量的代码逻辑
-        # 在此添加您的处理逻辑，如数据聚合、流量分析等
-        pass
-
-    def detect_attacks(self):
-        # 对每个数据包进行攻击检测的代码逻辑
-        # 在此添加您的攻击检测逻辑，如识别特定的攻击模式、检查异常行为等
-        pass

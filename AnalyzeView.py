@@ -132,6 +132,7 @@ class AnalyzeView(QMainWindow):
             # 通过PyShark读取pcap文件数据
             cap = pyshark.FileCapture(file_path)
             for packet in cap:
+               if hasattr(packet, 'ip'): 
                 if hasattr(packet, 'tcp'):
                     srcport = packet.tcp.srcport
                     dstport = packet.tcp.dstport
