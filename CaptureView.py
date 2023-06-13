@@ -175,8 +175,6 @@ class CaptureView(QMainWindow):
         if file_path:
         # 将test.pcap文件复制到指定路径
             shutil.copyfile("test.pcap", file_path)
-        
-
         QMessageBox.information(self, "成功", "数据保存成功！")
 
 

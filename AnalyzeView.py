@@ -1,15 +1,21 @@
-import pyshark
+
 import pandas as pd
 import altair as alt
 import numpy as np
+import tensorflow as tf
+
+import pyshark
+from sklearn.preprocessing import MinMaxScaler
 from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QLabel, QPushButton, QFileDialog, QWidget, QMessageBox, QListWidget, QScrollArea, QTextEdit, QLineEdit
 from PySide6.QtCore import Qt
 from PySide6.QtWebEngineWidgets import QWebEngineView
-import tensorflow as tf
+
 
 def extract_features_from_pcap(file_path, source_ip):
+    # 使用pyshark读取PCAP文件
     cap = pyshark.FileCapture(file_path)
-    
+
+    # 初始化各种变量以存储特征
     total_fwd_bytes = 0
     total_bwd_bytes = 0
     fwd_packets = 0
@@ -19,34 +25,49 @@ def extract_features_from_pcap(file_path, source_ip):
     psh_flags = 0
     timestamps = []
     init_win_bytes_forward = None
-    
+
+    # 遍历PCAP文件中的每个数据包
     for packet in cap:
+        # 检查数据包是否包含IP层
         if hasattr(packet, 'ip'):
+            # 检查数据包是否包含TCP层
             if hasattr(packet, 'tcp'):
+                # 判断此数据包是“向前”还是“向后”（根据源IP）
                 if packet.ip.src == source_ip:
-                    total_fwd_bytes += int(packet.tcp.len)
-                    fwd_packets += 1
-                    fwd_packet_lengths.append(int(packet.tcp.len))
+                    total_fwd_bytes += int(packet.tcp.len) # 计算向前的总字节数
+                    fwd_packets += 1  # 计算向前的数据包数量
+                    fwd_packet_lengths.append(int(packet.tcp.len))  # 存储每个向前的数据包长度
+                    # 存储向前的初始窗口大小（仅对第一个数据包）
                     if init_win_bytes_forward is None:
                         init_win_bytes_forward = int(packet.tcp.window_size_value)
                 else:
-                    total_bwd_bytes += int(packet.tcp.len)
-                    bwd_packets += 1
-                    bwd_packet_lengths.append(int(packet.tcp.len))
+                    total_bwd_bytes += int(packet.tcp.len) # 计算向后的总字节数
+                    bwd_packets += 1  # 计算向后的数据包数量
+                    bwd_packet_lengths.append(int(packet.tcp.len))  # 存储每个向后的数据包长度
                 
-                if packet.tcp.flags_psh == '1':
-                    psh_flags += 1
-                
+                # 检查TCP数据包是否设置了PSH标志
+                if hasattr(packet.tcp, 'flags_psh') and packet.tcp.flags_psh == '1':
+                    psh_flags += 1  # 计算设置了PSH标志的数据包数量
+
+                # 存储数据包的时间戳
                 timestamps.append(float(packet.sniff_timestamp))
 
+    # 计算流持续时间（最后一个和第一个数据包的时间差）
     flow_duration = max(timestamps) - min(timestamps) if timestamps else 0
+    # 计算流的到达时间的标准差
     flow_iat_std = np.std(np.diff(timestamps)) if timestamps else 0
+    # 向后的数据包的最小长度
     bwd_packet_length_min = min(bwd_packet_lengths) if bwd_packet_lengths else 0
+    # 向后的数据包长度的标准差
     bwd_packet_length_std = np.std(bwd_packet_lengths) if bwd_packet_lengths else 0
+    # 向前的数据包长度的平均值
     fwd_packet_length_mean = np.mean(fwd_packet_lengths) if fwd_packet_lengths else 0
+    # 每秒向后的数据包数量
     bwd_packets_per_second = bwd_packets / flow_duration if flow_duration > 0 else 0
+    # 平均数据包大小
     avg_packet_size = (total_fwd_bytes + total_bwd_bytes) / (fwd_packets + bwd_packets) if fwd_packets + bwd_packets > 0 else 0
-    
+
+    # 返回提取的特征作为列表
     return [
         bwd_packet_length_min,
         total_fwd_bytes,
@@ -61,6 +82,7 @@ def extract_features_from_pcap(file_path, source_ip):
         avg_packet_size
     ]
 
+    
 
 class AnalyzeView(QMainWindow):
     def __init__(self):
@@ -198,14 +220,30 @@ class AnalyzeView(QMainWindow):
             return
 
         self.source_ip = self.source_ip_input.text()  # 从输入框中获取源IP地址
+        
 
-        features = extract_features_from_pcap(self.file_path, self.source_ip)
+        features_array = extract_features_from_pcap(self.file_path, self.source_ip)
+        features_array = np.array(features_array).reshape(1, -1)
+    
+        # 使用MinMaxScaler进行归一化
+        scaler = MinMaxScaler()
+        normalized_features = scaler.fit_transform(features_array)
+
+          # 返回归一化的特征作为列表
+        normalized_features = normalized_features[0].tolist()
+  
+    
+        
+        feature_names = ['Bwd_Packet_Length_Min','Subflow_Fwd_Bytes','Total_Length_of_Fwd_Packets','Fwd_Packet_Length_Mean','Bwd_Packet_Length_Std','Flow_Duration','Flow_IAT_Std','Init_Win_bytes_forward','Bwd_Packets/s',
+                 'PSH_Flag_Count','Average_Packet_Size']
+        # 将特征转换为字典
+        features_dict = {name: np.array([value]) for name, value in zip(feature_names, normalized_features)}
 
         # 加载保存的模型
         reconstructed_model = tf.keras.models.load_model('Final_Model')
 
         # 进行推断
-        inference_ds = tf.data.Dataset.from_tensor_slices([features]).batch(1)
+        inference_ds = tf.data.Dataset.from_tensor_slices(features_dict).batch(1)
         predictions = reconstructed_model.predict(inference_ds)
 
         # 输出预测结果
@@ -214,9 +252,9 @@ class AnalyzeView(QMainWindow):
         for prediction in predictions:
             predicted_class = class_names[prediction.argmax()]
             if predicted_class == 'Class1':
-                result += '受到攻击\n'
-            else:
                 result += '未受到攻击\n'
+            else:
+                result += '受到攻击\n'
 
         # 显示检测结果
         self.result_text_edit.setText(result)

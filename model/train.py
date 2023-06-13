@@ -13,12 +13,12 @@ from tensorflow import feature_column
 from tensorflow import keras as keras
 from keras import layers
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import f1_score, recall_score
 import datetime
 
 start_time = datetime.datetime.now()
 
-CSV_FILE_PATH = 'binary_classification.csv'
+CSV_FILE_PATH = 'model/binary_classification.csv'
 df = pd.read_csv(CSV_FILE_PATH)
 
 #Object类型转换为离散数值（Label列）
@@ -30,16 +30,6 @@ columns_counts = df.shape[1]                                                #获
 for i in range(columns_counts):
   if(df.iloc[:,i].dtypes) != 'float64':
     df.iloc[:, i] = df.iloc[:,i].astype(float)
-
-'''
-#将特征随时间变化用图像展示出来
-ts = df['Init_Win_bytes_forward']
-ts.plot(title='PortScan:Init_Win_bytes_forward')
-plt.xlabel('Time-Step')
-plt.ylim(0,80000)
-plt.xlim(0,1000)
-plt.show()
-'''
 
 #选取11个特征和Label
 features_considered = ['Target','Bwd_Packet_Length_Min','Subflow_Fwd_Bytes','Total_Length_of_Fwd_Packets','Fwd_Packet_Length_Mean','Bwd_Packet_Length_Std','Flow_Duration','Flow_IAT_Std','Init_Win_bytes_forward','Bwd_Packets/s',
@@ -119,19 +109,11 @@ model.compile(optimizer='Adam',
                        ],
               run_eagerly=True)
 
-#其他指标、使用Tensorboard
-tf.keras.metrics.Recall(),
-tf.keras.metrics.FalsePositives(),
-tf.keras.metrics.TrueNegatives()
-log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-log_dir = "graph/log_fit/13"
-tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-
 model.fit(train_ds,
           validation_data=val_ds,
           epochs=20
           )
-# callbacks=[tensorboard_callback]
+
 
 loss, accuracy = model.evaluate(test_ds)
 print("loss:",loss)
@@ -146,7 +128,7 @@ print("spend_time:",(end_time-start_time).seconds)
 
 model.save('Final_Model')
 begin_time = datetime.datetime.now()
-reconstructed_model = tf.keras.models.load_model('Final_Model')
+reconstructed_model = tf.keras.models.load_model('New_Final_Model')
 
 reconstructed_model.evaluate(test_ds)
 

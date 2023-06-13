@@ -9,7 +9,7 @@ from AnalyzeView import AnalyzeView
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Main Window")
+        self.setWindowTitle("主页")
         self.setFixedSize(1280, 960)  # 设置窗口大小为1280x960c
 
         self.setStyleSheet("""
